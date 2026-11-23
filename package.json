@@ -1,0 +1,21 @@
+{
+  "name": "circuit-bench-hud",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5190",
+    "build": "vite build --outDir Output/dist --emptyOutDir",
+    "preview": "vite preview --outDir Output/dist --port 5191"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist-mono": "^5.2.0",
+    "@monohud/css": "0.1.0",
+    "@monohud/react": "0.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.0.0"
+  }
+}
