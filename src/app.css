@@ -98,9 +98,34 @@ html, body, #root { height: 100%; margin: 0; background: oklch(0.08 0 0); }
 .ide__code { min-height: 0; }
 
 .editor { position: relative; flex: 1; min-height: 300px; display: flex; border: 1px solid color-mix(in oklch, var(--mh-line) 45%, transparent); background: oklch(0.09 0 0); }
-.editor__gutter { margin: 0; padding: 10px 8px; width: 40px; flex: none; overflow: hidden; text-align: right; color: var(--mh-fg-faint); font: 13px/1.55 var(--mh-font-data); border-right: 1px solid color-mix(in oklch, var(--mh-line) 35%, transparent); user-select: none; }
+.editor__gutter { margin: 0; padding: 10px 8px 40px; width: 40px; flex: none; overflow: hidden; text-align: right; color: var(--mh-fg-faint); font: 13px/1.55 var(--mh-font-data); border-right: 1px solid color-mix(in oklch, var(--mh-line) 35%, transparent); user-select: none; }
 .editor__gutter span[data-err] { color: var(--mh-danger); }
-.editor__text { flex: 1; resize: none; border: 0; outline: 0; margin: 0; padding: 10px 12px; background: transparent; color: var(--mh-fg); font: 13px/1.55 var(--mh-font-data); white-space: pre; overflow: auto; tab-size: 2; caret-color: var(--mh-accent); }
+.editor__code { position: relative; flex: 1; min-width: 0; display: flex; }
+.editor__text { position: relative; flex: 1; resize: none; border: 0; outline: 0; margin: 0; padding: 10px 12px; background: transparent; color: transparent; -webkit-text-fill-color: transparent; font: 13px/1.55 var(--mh-font-data); white-space: pre; overflow: auto; tab-size: 2; caret-color: var(--mh-accent); }
+.editor__text::selection { background: color-mix(in oklch, var(--mh-accent) 35%, transparent); }
+/* Coloured copy of the code under the textarea: same font, padding and scroll position. */
+.editor__hl { position: absolute; inset: 0; margin: 0; padding: 10px 12px 40px; overflow: hidden; pointer-events: none; font: 13px/1.55 var(--mh-font-data); white-space: pre; tab-size: 2; color: var(--cb-code-var); }
+.hl-line { display: block; min-height: 1.55em; }
+.hl-line[data-err] { background: color-mix(in oklch, var(--mh-danger) 16%, transparent); box-shadow: inset 2px 0 0 var(--mh-danger); }
+/* One colour per kind of code element. */
+:root {
+  --cb-code-comment: #5f6b8f; --cb-code-string: #9ece6a; --cb-code-number: #ff9e64; --cb-code-preproc: #f7768e;
+  --cb-code-keyword: #bb9af7; --cb-code-type: #2ac3de; --cb-code-builtin: #7aa2f7; --cb-code-object: #ffc777;
+  --cb-code-func: #fca7ea; --cb-code-constant: #73daca; --cb-code-var: #c8d3f5; --cb-code-op: #89ddff; --cb-code-punct: #8a93b8;
+}
+.hl-comment { color: var(--cb-code-comment); font-style: italic; }
+.hl-string { color: var(--cb-code-string); }
+.hl-number { color: var(--cb-code-number); }
+.hl-preproc { color: var(--cb-code-preproc); }
+.hl-keyword { color: var(--cb-code-keyword); }
+.hl-type { color: var(--cb-code-type); }
+.hl-builtin, .hl-method { color: var(--cb-code-builtin); }
+.hl-object { color: var(--cb-code-object); }
+.hl-func { color: var(--cb-code-func); }
+.hl-constant { color: var(--cb-code-constant); }
+.hl-var { color: var(--cb-code-var); }
+.hl-op { color: var(--cb-code-op); }
+.hl-punct { color: var(--cb-code-punct); }
 .editor__text:focus-visible { box-shadow: inset 0 0 0 1px var(--mh-accent); }
 .editor__err { margin: 0; color: var(--mh-danger); font: var(--mh-text-xs)/1.4 var(--mh-font-data); }
 .editor__errlink { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }

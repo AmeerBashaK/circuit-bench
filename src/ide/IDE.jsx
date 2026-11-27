@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Button, Menu, Panel, Progress, Readout, Select, Slider, Status, Switch, Tag, Tooltip, useToast } from '@monohud/react';
 import { SKETCH_NAMES, createRuntime, errorLine } from './runtime.js';
 import { friendlyError, lintSketch } from './lint.js';
+import { tokenLines } from './highlight.js';
 import { SKETCHES, fillSketch } from './examples.js';
 import { BOARDS, BOARD_ITEMS, CAPS, CAP_VOLTS, COMPONENTS, RAIL_LENGTHS, railHoles, resizeRail, MODULES, PARTS, RESISTORS, componentDemo, defaultLayout, fmtR, netlist, newId, partLabels, propsOf, sketchPins } from './boards.js';
 import { createCircuit } from './circuit.js';
@@ -67,7 +68,7 @@ export function IDE({ active }) {
   const [lastExample, setLastExample] = React.useState(() => store.get('cbh-ide-example', { key: 'dashboard', filled: null }));
   const [env, setEnv] = React.useState({});
   const [state, setState] = React.useState({ status: 'idle', error: '', line: null, upload: 0, errLines: [] });
-  const editorRef = React.useRef(null);
+  const editorRef = React.useRef(null), gutterRef = React.useRef(null), hlRef = React.useRef(null);
   // Put the caret on a line and scroll it into view.
   const goToLine = (n) => {
     const ta = editorRef.current; if (!ta || !n) return;
@@ -412,6 +413,7 @@ export function IDE({ active }) {
   const running = state.status === 'running';
   const uptime = running ? (performance.now() - started.current) / 1000 : 0;
   const lines = code.split('\n').length;
+  const coloured = React.useMemo(() => tokenLines(code), [code]);
   const pinLabel = (g) => B.pins.find((p) => p.kind === 'gpio' && p.gpio === g)?.label ?? String(g);
   const parts = nl.parts;
   const hasOled = parts.some((p) => p.obj.type === 'oled');
@@ -442,10 +444,20 @@ export function IDE({ active }) {
       <div className="ide__grid">
         <Panel title="Sketch" meta={`main.ino / ${lines} LINES`} className="ide__code" enterDelay={60}>
           <div className="editor">
-            <pre className="editor__gutter" aria-hidden="true">{Array.from({ length: lines }, (_, i) => <span key={i} data-err={state.errLines?.includes(i + 1) ? '' : undefined}>{i + 1}{'\n'}</span>)}</pre>
-            <textarea ref={editorRef} className="editor__text" value={code} spellCheck={false} aria-label="Sketch code"
-              onChange={(e) => setCode(e.target.value)} onKeyDown={onKeyDown}
-              onScroll={(e) => { e.currentTarget.previousSibling.scrollTop = e.currentTarget.scrollTop; }} />
+            <pre ref={gutterRef} className="editor__gutter" aria-hidden="true">{Array.from({ length: lines }, (_, i) => <span key={i} data-err={state.errLines?.includes(i + 1) ? '' : undefined}>{i + 1}{'\n'}</span>)}</pre>
+            {/* The textarea takes the typing with invisible text; the coloured copy underneath shows through it. */}
+            <div className="editor__code">
+              <pre ref={hlRef} className="editor__hl" aria-hidden="true">
+                {coloured.map((toks, i) => (
+                  <span key={i} className="hl-line" data-err={state.errLines?.includes(i + 1) ? '' : undefined}>
+                    {toks.length ? toks.map((t, j) => (t.kind ? <span key={j} className={`hl-${t.kind}`}>{t.text}</span> : t.text)) : ' '}
+                  </span>
+                ))}
+              </pre>
+              <textarea ref={editorRef} className="editor__text" value={code} spellCheck={false} aria-label="Sketch code"
+                onChange={(e) => setCode(e.target.value)} onKeyDown={onKeyDown}
+                onScroll={(e) => { const t = e.currentTarget; gutterRef.current.scrollTop = t.scrollTop; hlRef.current.scrollTop = t.scrollTop; hlRef.current.scrollLeft = t.scrollLeft; }} />
+            </div>
           </div>
           {state.status === 'uploading' && <Progress label="Uploading" value={state.upload} cells={20} gap={2} hideScale />}
           {state.error && (state.line
