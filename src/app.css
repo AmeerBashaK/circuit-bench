@@ -31,7 +31,10 @@ html, body, #root { height: 100%; margin: 0; background: oklch(0.08 0 0); }
 .stage__wrap { position: relative; flex: 1; min-height: 320px; }
 .stage__cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
 .stage__hint { position: absolute; left: 20px; right: 120px; bottom: 12px; margin: 0; pointer-events: none; }
-.stage__zoom { position: absolute; right: 16px; bottom: 8px; display: flex; gap: 2px; }
+.stage__zoom { position: absolute; right: 16px; bottom: 8px; left: 16px; display: flex; flex-wrap: wrap-reverse; justify-content: flex-end; align-items: center; gap: 2px; pointer-events: none; }
+.stage__zoom > * { pointer-events: auto; }
+/* Zoom out, Fit and zoom in stay together; when the footer is short of room, whole groups move up a line. */
+.zoomgroup { display: inline-flex; flex-wrap: nowrap; gap: 2px; }
 
 /* Panels */
 .stack { display: flex; flex-direction: column; gap: 12px; }
@@ -71,10 +74,141 @@ html, body, #root { height: 100%; margin: 0; background: oklch(0.08 0 0); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 @media (max-width: 1180px) {
-  .app { overflow: auto; }
-  .shell { height: auto; min-height: 100%; }
+  /* The shell scrolls, not .app: .app is where menus and dropdowns are placed, so it must stay put. */
+  .app { overflow: hidden; }
+  .shell { height: 100%; overflow-y: auto; }
+  .shell > * { flex: none; }
   .work { grid-template-columns: minmax(0, 1fr); }
   .stage { order: -1; }
   .stage__wrap { min-height: 62vh; }
   .side { overflow: visible; }
 }
+
+[hidden] { display: none !important; }
+
+/* ESP32 IDE */
+.ide { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.ide__grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.5fr) 340px; gap: 12px; }
+.ide__mid, .ide__side { min-height: 0; display: flex; flex-direction: column; gap: 12px; overflow: auto; padding: 2px; }
+.ide__mid > .mh-panel-frame, .ide__side > .mh-panel-frame { flex: none; }
+.ide__board { flex: 1 1 auto !important; }
+.ide__serial { flex: 1 1 260px !important; min-height: 260px; }
+.ide__serial .mh-panel__body { display: flex; flex-direction: column; min-height: 0; }
+.ide__code .mh-panel__body { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.ide__code { min-height: 0; }
+
+.editor { position: relative; flex: 1; min-height: 300px; display: flex; border: 1px solid color-mix(in oklch, var(--mh-line) 45%, transparent); background: oklch(0.09 0 0); }
+.editor__gutter { margin: 0; padding: 10px 8px; width: 40px; flex: none; overflow: hidden; text-align: right; color: var(--mh-fg-faint); font: 13px/1.55 var(--mh-font-data); border-right: 1px solid color-mix(in oklch, var(--mh-line) 35%, transparent); user-select: none; }
+.editor__gutter span[data-err] { color: var(--mh-danger); }
+.editor__text { flex: 1; resize: none; border: 0; outline: 0; margin: 0; padding: 10px 12px; background: transparent; color: var(--mh-fg); font: 13px/1.55 var(--mh-font-data); white-space: pre; overflow: auto; tab-size: 2; caret-color: var(--mh-accent); }
+.editor__text:focus-visible { box-shadow: inset 0 0 0 1px var(--mh-accent); }
+.editor__err { margin: 0; color: var(--mh-danger); font: var(--mh-text-xs)/1.4 var(--mh-font-data); }
+.editor__errlink { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.editor__errlink:focus-visible { outline: 1px solid var(--mh-danger); outline-offset: 2px; }
+
+.board { display: block; width: 100%; height: auto; max-height: 560px; font-family: var(--mh-font-data); }
+.board__pcb { fill: oklch(0.13 0 0); stroke: var(--mh-line); stroke-width: 1; }
+.board__module { fill: oklch(0.17 0 0); stroke: var(--mh-line-strong); stroke-width: 1; }
+.board__antenna { fill: none; stroke: var(--mh-line); stroke-width: 1.2; }
+.board__chip { fill: var(--mh-fg-faint); font-size: 8px; letter-spacing: 0.08em; }
+.board__chip-ring { fill: none; stroke: color-mix(in oklch, var(--mh-line) 60%, transparent); }
+.board__usb { fill: none; stroke: var(--mh-line-strong); }
+.board__btn { fill: oklch(0.2 0 0); stroke: var(--mh-line); }
+.board__led { fill: oklch(0.22 0 0); stroke: var(--mh-line); transition: fill 80ms; }
+.board__led--on { fill: #5aa9ff; stroke: #5aa9ff; filter: drop-shadow(0 0 6px #5aa9ff); }
+.board__led--red { fill: var(--mh-danger); stroke: var(--mh-danger); filter: drop-shadow(0 0 4px var(--mh-danger)); }
+.pin__pad { fill: oklch(0.1 0 0); stroke: var(--mh-line-strong); stroke-width: 1; transition: fill 80ms; }
+.pin__label { fill: var(--mh-fg-faint); font-size: 8.5px; }
+.pin__tag { fill: var(--mh-fg); font-size: 8.5px; letter-spacing: 0.06em; }
+.pin__lead { stroke: var(--mh-line-strong); stroke-dasharray: 2 2; }
+.pin--power .pin__pad { stroke: var(--mh-line); }
+.pin--high .pin__pad { fill: var(--mh-accent); stroke: var(--mh-accent); filter: drop-shadow(0 0 4px var(--mh-accent)); }
+.pin--high .pin__label { fill: var(--mh-fg); }
+.pin--input .pin__pad { stroke: var(--mh-ok); }
+
+.oled { padding: 10px; background: oklch(0.06 0 0); border: 1px solid color-mix(in oklch, var(--mh-line) 40%, transparent); }
+.oled__cv { display: block; width: 100%; aspect-ratio: 2 / 1; image-rendering: pixelated; filter: drop-shadow(0 0 3px rgba(200, 230, 255, 0.45)); background: #06080a; }
+
+.sensors { display: flex; flex-direction: column; gap: 14px; }
+.sensor { display: flex; flex-direction: column; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid color-mix(in oklch, var(--mh-line) 30%, transparent); }
+.sensor:last-of-type { border-bottom: 0; padding-bottom: 0; }
+.sensor__name { font-size: var(--mh-text-sm); color: var(--mh-fg); }
+.sensor__pins { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.serial { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.serial__out { flex: 1; min-height: 80px; max-height: 320px; overflow: auto; padding: 8px 10px; background: oklch(0.08 0 0); border: 1px solid color-mix(in oklch, var(--mh-line) 40%, transparent); font: 12px/1.5 var(--mh-font-data); }
+.serial__line { white-space: pre-wrap; word-break: break-all; color: var(--mh-fg); }
+.serial__line--sys { color: var(--mh-fg-faint); }
+.serial__line--in { color: var(--mh-accent); }
+.serial__line--warn { color: var(--mh-warn); }
+.serial__line--err { color: var(--mh-danger); }
+.serial__in { display: flex; gap: 8px; }
+.serial__field { flex: 1; min-width: 0; background: oklch(0.1 0 0); border: 1px solid var(--mh-line); color: var(--mh-fg); font: 12px var(--mh-font-data); padding: 6px 8px; outline: 0; }
+.serial__field:focus-visible { border-color: var(--mh-accent); }
+.serial__baud { min-width: 150px; }
+
+@media (max-width: 1180px) {
+  .ide__grid { grid-template-columns: minmax(0, 1fr); }
+  .ide__mid, .ide__side { overflow: visible; }
+  /* The shell scrolls in this layout, so the IDE takes its natural height instead of filling the window. */
+  .ide, .ide__grid { flex: none; min-height: auto; }
+}
+
+/* Wiring bench */
+.ide__bench { min-height: 0; }
+.ide__bench .mh-panel__body { display: flex; padding: 8px; }
+.wb { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.wb__tools { display: flex; flex-wrap: wrap; gap: 2px; }
+.wb__stage { position: relative; flex: 1; min-height: 360px; }
+.wb__cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: 0; }
+.wb__cv:focus-visible { box-shadow: inset 0 0 0 1px var(--mh-accent); }
+.ide__boardsel { min-width: 210px; }
+.sensor[data-selected] { border-left: 2px solid var(--mh-accent); padding-left: 8px; }
+.sensor__name { all: unset; cursor: pointer; font-size: var(--mh-text-sm); color: var(--mh-fg); }
+.sensor__name:focus-visible { outline: 1px solid var(--mh-accent); }
+.sensor__links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.sensor__links [data-bad] { color: var(--mh-warn); }
+@media (max-width: 1180px) { .wb__stage { min-height: 60vh; } }
+.wb__group { align-self: center; min-width: 84px; color: var(--mh-fg-faint); }
+.sensor__warn { color: var(--mh-warn); }
+.wb__lessons { min-width: 280px; }
+.lesson__title { margin: 0; font-family: var(--mh-font-display); font-size: var(--mh-text-md); color: var(--mh-fg); text-shadow: var(--mh-glow); }
+.lesson__list { margin: 0; display: grid; gap: 4px 0; }
+.lesson__list dt { font-size: var(--mh-text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--mh-fg-faint); margin-top: 6px; }
+.lesson__list dd { margin: 0; font-size: var(--mh-text-sm); line-height: 1.5; color: var(--mh-fg-muted); }
+
+/* Bench tools on one row; the hint sits top-left so the footer buttons never cover it. */
+.wb__tools { align-items: center; gap: 6px; }
+.wb__lessons { flex: 1 1 220px; min-width: 0; max-width: 340px; }
+.wb .stage__hint { top: 10px; bottom: auto; left: 14px; right: 14px; }
+/* The mode tabs scroll inside their own row instead of pushing the page wider. */
+.top__tabs { min-width: 0; max-width: 100%; }
+@media (max-width: 600px) {
+  .shell { padding: 10px 10px 14px; }
+  .top { gap: 8px 12px; }
+  .top__facts { gap: 12px; }
+  .stage__zoom { left: 8px; right: 8px; }
+  /* All three mode tabs fit on a phone: tighter padding, and the 01/02/03 counters go. */
+  .top__tabs { width: 100%; }
+  .top__tabs .mh-tab { padding-inline: 10px; letter-spacing: 0.03em; flex: 1 1 auto; }
+  .top__tabs .mh-tab::before { display: none; }
+}
+
+/* Settings: text colour and neon glow */
+.settings__label { padding: 6px 12px 2px; }
+.swatch { display: inline-block; width: 10px; height: 10px; margin-right: 8px; vertical-align: -1px; border: 1px solid color-mix(in oklch, var(--mh-line) 60%, transparent); }
+/* Force neon glow: every piece of text gets a halo in its own colour. */
+.app[data-cb-glow] *, .app[data-cb-glow] input, .app[data-cb-glow] textarea {
+  text-shadow: 0 0 2px currentColor, 0 0 9px color-mix(in oklch, currentColor 55%, transparent) !important;
+}
+.mission__clear { margin: 0; color: var(--mh-ok); font-size: var(--mh-text-sm); line-height: 1.5; }
+
+/* Logic levels: truth table */
+.truth { display: flex; flex-direction: column; gap: 8px; }
+.truth__table { width: 100%; border-collapse: collapse; font: var(--mh-text-sm) var(--mh-font-data); }
+.truth__table th { text-align: left; font-weight: 500; font-size: var(--mh-text-xs); color: var(--mh-fg-faint); padding: 2px 6px; border-bottom: 1px solid color-mix(in oklch, var(--mh-line) 50%, transparent); }
+.truth__table td { padding: 3px 6px; color: var(--mh-fg-muted); }
+.truth__table tr[data-ok="yes"] td { color: var(--mh-ok); }
+.truth__table tr[data-ok="no"] td { color: var(--mh-danger); }
+.truth__volts { white-space: nowrap; }
+.truth__mark { font-weight: 700; }
