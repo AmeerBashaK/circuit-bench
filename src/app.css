@@ -241,3 +241,24 @@ html, body, #root { height: 100%; margin: 0; background: oklch(0.08 0 0); }
 .truth__table tr[data-ok="no"] td { color: var(--mh-danger); }
 .truth__volts { white-space: nowrap; }
 .truth__mark { font-weight: 700; }
+
+/* Touch (Android app): bench, display and serial monitor in a swipeable carousel */
+.carousel { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.carousel__tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.carousel__tab { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: transparent; color: var(--mh-fg-dim, var(--mh-fg));
+  border: 1px solid color-mix(in oklch, var(--mh-line) 50%, transparent); font: 600 var(--mh-text-xs)/1 var(--mh-font-data); letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+.carousel__tab[aria-selected='true'] { color: var(--mh-fg); border-color: var(--mh-accent); box-shadow: inset 0 -2px 0 var(--mh-accent); }
+.carousel__dot { width: 6px; height: 6px; background: currentColor; opacity: 0.35; }
+.carousel__tab[aria-selected='true'] .carousel__dot { opacity: 1; background: var(--mh-accent); }
+.carousel__track { flex: 1; min-height: 0; display: flex; gap: 12px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px; }
+.carousel__track::-webkit-scrollbar { display: none; }
+/* Each panel takes most of the width, so the edge of the next one shows and invites a swipe. */
+.carousel__slide { flex: 0 0 calc(100% - 28px); min-width: 0; display: flex; flex-direction: column; scroll-snap-align: start; }
+.carousel__slide > * { flex: 1 1 auto; min-height: 0; }
+.carousel__slide .ide__serial { min-height: 0; }
+/* The side column is narrow, like the desktop's right-hand column: display on top, serial monitor below. */
+.carousel__slide[data-kind='side'] { flex-basis: min(360px, calc(100% - 28px)); }
+.carousel__stack { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.carousel__stack > .mh-panel-frame { flex: none; }
+.carousel__stack > .ide__serial { flex: 1 1 auto !important; min-height: 0; }
+@media (max-width: 1180px) { .carousel__track { height: min(78vh, 720px); } }

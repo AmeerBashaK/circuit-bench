@@ -87,7 +87,7 @@ A `.cbench` file is JSON:
 
 ## Desktop and touch: `platform.js`
 
-`touchUI` is true inside the Android app (Capacitor) or on a touch-first screen. Touch gets separate **Select** and **Pan** tools (there is no Shift key), two-finger pan and pinch zoom, and a fixed-height code editor that scrolls inside itself. The desktop keeps drag-to-pan and Shift + drag to box-select.
+`touchUI` is true inside the Android app (Capacitor) or on a touch-first screen. Touch gets separate **Select** and **Pan** tools (there is no Shift key), two-finger pan and pinch zoom, a fixed-height code editor that scrolls inside itself, and in the Maker IDE a swipeable carousel (`Carousel` in `IDE.jsx`) with the wiring bench on one slide and the display stacked over the serial monitor on the other. The desktop keeps drag-to-pan and Shift + drag to box-select.
 
 ## Adding things
 

@@ -423,6 +423,66 @@ export function IDE({ active }) {
   const selObj = selection?.kind === 'obj' ? layout.objects.find((o) => o.id === selection.id) : null;
   const benchGroup = bench.current?.group, groupSize = benchGroup ? benchGroup.objs.length + benchGroup.wires.length : 0;
 
+  // The bench, display and serial monitor. Desktop shows them in columns; touch puts them in a swipeable carousel.
+  const benchPanel = (
+      <Panel title="Wiring bench" meta={`${B.name.toUpperCase()} / ${layout.wires.length} WIRES`} className="ide__bench" enterDelay={140}>
+        <div className="wb">
+          {/* One row: parts live in menus so the bench keeps its height on smaller screens. */}
+          <div className="wb__tools" role="toolbar" aria-label="Bench tools">
+            <Menu.Root>
+              <Menu.Trigger render={<Button size="sm" />}>+ Module</Menu.Trigger>
+              <Menu.Content align="start">
+                {MODULES.map((t) => <Menu.Item key={t} onClick={() => addPart(t)} hint={PARTS[t].model}>{PARTS[t].name}</Menu.Item>)}
+              </Menu.Content>
+            </Menu.Root>
+            <Menu.Root>
+              <Menu.Trigger render={<Button size="sm" />}>+ Component</Menu.Trigger>
+              <Menu.Content align="start">
+                {COMPONENTS.map((t) => <Menu.Item key={t} onClick={() => addPart(t)} hint={PARTS[t].model}>{PARTS[t].name}</Menu.Item>)}
+                <Menu.Separator />
+                <Menu.Item onClick={() => addPart('rail')} hint="+ / −">Power rail</Menu.Item>
+              </Menu.Content>
+            </Menu.Root>
+            <Select className="wb__lessons" items={LESSON_ITEMS} value={null} placeholder="Lessons: what goes wrong when…" onValueChange={(v) => v && openLesson(v)} aria-label="Load a failure lesson" />
+          </div>
+          <div className="wb__stage">
+            <canvas ref={benchCv} className="wb__cv" tabIndex={0} aria-label="Wiring bench. Drag from a pin to another pin to add a jumper wire. Drag parts to move them, drag empty space to pan, scroll to zoom."
+              onKeyDown={(e) => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSelected(); } if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey) rotateSelected(); if (e.key === 'Escape') bench.current?.select(null); }} />
+            <p className="stage__hint mh-micro">{selection ? `${USE_HINT[selObj?.type] ? `${USE_HINT[selObj.type]} · ` : ''}DEL removes the selected ${selection.kind === 'wire' ? 'wire' : 'part'}${selObj && PARTS[selObj.type]?.axial ? ' · R rotates it' : ''}` : `Drag pin to pin to add a wire. Click a wire, then drag its end handle to move it to another pin. ${touchUI ? 'Select: drag empty space to box-select. Pan: drag to move around. Two fingers pan and pinch.' : 'Drag empty space to pan, Shift+drag to box-select.'} Ctrl+Z undoes. Scroll to zoom.`}</p>
+            <div className="stage__zoom">
+              {selObj && PARTS[selObj.type]?.axial && <Button size="sm" variant="ghost" onClick={rotateSelected}>Rotate</Button>}
+              {groupSize > 0 && !(groupSize === 1 && selObj?.kind === 'board') && <Button size="sm" variant="danger" onClick={removeSelected}>{groupSize > 1 ? `Delete ${groupSize}` : 'Delete'}</Button>}
+              {touchUI && <span className="zoomgroup" role="group" aria-label="Bench tool">
+                <Button size="sm" variant={benchTool === 'select' ? 'secondary' : 'ghost'} aria-pressed={benchTool === 'select'} title="Drag empty space to box-select" onClick={() => pickTool('select')}>Select</Button>
+                <Button size="sm" variant={benchTool === 'pan' ? 'secondary' : 'ghost'} aria-pressed={benchTool === 'pan'} title="Drag to move around the bench" onClick={() => pickTool('pan')}>Pan</Button>
+              </span>}
+              <Button size="sm" variant="ghost" disabled={!groupSize} title="Ctrl + C" onClick={copySelected}>Copy</Button>
+              <Button size="sm" variant="ghost" disabled={!clip.current} title="Ctrl + V" onClick={pasteClip}>Paste</Button>
+              <Button size="sm" variant="ghost" disabled={!hist.current.past.length} title="Ctrl + Z" onClick={() => travel(true)}>Undo</Button>
+              <Button size="sm" variant="ghost" disabled={!hist.current.future.length} title="Ctrl + Y" onClick={() => travel(false)}>Redo</Button>
+              <Button size="sm" variant="ghost" onClick={clearBoard}>Clear board</Button>
+              <Button size="sm" variant="ghost" onClick={() => { changeBoardReset(); }}>Reset wiring</Button>
+              <span className="zoomgroup">
+              <Button size="sm" variant="ghost" aria-label="Zoom out" onClick={() => bench.current.zoomBy(0.8)}>−</Button>
+              <Button size="sm" variant="ghost" onClick={() => bench.current.fit()}>Fit</Button>
+              <Button size="sm" variant="ghost" aria-label="Zoom in" onClick={() => bench.current.zoomBy(1.25)}>+</Button>
+              </span>
+            </div>
+          </div>
+          {nl.shorts && <p className="editor__err">Short circuit: a power pin and GND are wired together. Every module is switched off until you remove that wire.</p>}
+        </div>
+      </Panel>
+  );
+  const displayPanel = (
+    <Panel title="Display" meta={`SSD1306 / SDA ${pinLabel(B.i2c.sda)} SCL ${pinLabel(B.i2c.scl)}`} enterDelay={260}>
+      <div className="oled"><canvas ref={oledCv} width={128} height={64} className="oled__cv" aria-label="OLED display output" /></div>
+    </Panel>
+  );
+  const serialPanel = (
+    <SerialMonitor lines={serial} baud={monitorBaud} setBaud={setMonitorBaud} sketchBaud={rt.current?.baud}
+      onSend={(t) => { rt.current?.send(t + '\n'); pushSerial(`> ${t}\n`, 'in'); }} onClear={() => setSerial([])} />
+  );
+
   return (
     <div className="ide" hidden={!active}>
       <div className="bar ide__bar">
@@ -468,53 +528,7 @@ export function IDE({ active }) {
             : <p className="editor__err">{state.error}</p>)}
         </Panel>
 
-        <Panel title="Wiring bench" meta={`${B.name.toUpperCase()} / ${layout.wires.length} WIRES`} className="ide__bench" enterDelay={140}>
-          <div className="wb">
-            {/* One row: parts live in menus so the bench keeps its height on smaller screens. */}
-            <div className="wb__tools" role="toolbar" aria-label="Bench tools">
-              <Menu.Root>
-                <Menu.Trigger render={<Button size="sm" />}>+ Module</Menu.Trigger>
-                <Menu.Content align="start">
-                  {MODULES.map((t) => <Menu.Item key={t} onClick={() => addPart(t)} hint={PARTS[t].model}>{PARTS[t].name}</Menu.Item>)}
-                </Menu.Content>
-              </Menu.Root>
-              <Menu.Root>
-                <Menu.Trigger render={<Button size="sm" />}>+ Component</Menu.Trigger>
-                <Menu.Content align="start">
-                  {COMPONENTS.map((t) => <Menu.Item key={t} onClick={() => addPart(t)} hint={PARTS[t].model}>{PARTS[t].name}</Menu.Item>)}
-                  <Menu.Separator />
-                  <Menu.Item onClick={() => addPart('rail')} hint="+ / −">Power rail</Menu.Item>
-                </Menu.Content>
-              </Menu.Root>
-              <Select className="wb__lessons" items={LESSON_ITEMS} value={null} placeholder="Lessons: what goes wrong when…" onValueChange={(v) => v && openLesson(v)} aria-label="Load a failure lesson" />
-            </div>
-            <div className="wb__stage">
-              <canvas ref={benchCv} className="wb__cv" tabIndex={0} aria-label="Wiring bench. Drag from a pin to another pin to add a jumper wire. Drag parts to move them, drag empty space to pan, scroll to zoom."
-                onKeyDown={(e) => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSelected(); } if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey) rotateSelected(); if (e.key === 'Escape') bench.current?.select(null); }} />
-              <p className="stage__hint mh-micro">{selection ? `${USE_HINT[selObj?.type] ? `${USE_HINT[selObj.type]} · ` : ''}DEL removes the selected ${selection.kind === 'wire' ? 'wire' : 'part'}${selObj && PARTS[selObj.type]?.axial ? ' · R rotates it' : ''}` : `Drag pin to pin to add a wire. Click a wire, then drag its end handle to move it to another pin. ${touchUI ? 'Select: drag empty space to box-select. Pan: drag to move around. Two fingers pan and pinch.' : 'Drag empty space to pan, Shift+drag to box-select.'} Ctrl+Z undoes. Scroll to zoom.`}</p>
-              <div className="stage__zoom">
-                {selObj && PARTS[selObj.type]?.axial && <Button size="sm" variant="ghost" onClick={rotateSelected}>Rotate</Button>}
-                {groupSize > 0 && !(groupSize === 1 && selObj?.kind === 'board') && <Button size="sm" variant="danger" onClick={removeSelected}>{groupSize > 1 ? `Delete ${groupSize}` : 'Delete'}</Button>}
-                {touchUI && <span className="zoomgroup" role="group" aria-label="Bench tool">
-                  <Button size="sm" variant={benchTool === 'select' ? 'secondary' : 'ghost'} aria-pressed={benchTool === 'select'} title="Drag empty space to box-select" onClick={() => pickTool('select')}>Select</Button>
-                  <Button size="sm" variant={benchTool === 'pan' ? 'secondary' : 'ghost'} aria-pressed={benchTool === 'pan'} title="Drag to move around the bench" onClick={() => pickTool('pan')}>Pan</Button>
-                </span>}
-                <Button size="sm" variant="ghost" disabled={!groupSize} title="Ctrl + C" onClick={copySelected}>Copy</Button>
-                <Button size="sm" variant="ghost" disabled={!clip.current} title="Ctrl + V" onClick={pasteClip}>Paste</Button>
-                <Button size="sm" variant="ghost" disabled={!hist.current.past.length} title="Ctrl + Z" onClick={() => travel(true)}>Undo</Button>
-                <Button size="sm" variant="ghost" disabled={!hist.current.future.length} title="Ctrl + Y" onClick={() => travel(false)}>Redo</Button>
-                <Button size="sm" variant="ghost" onClick={clearBoard}>Clear board</Button>
-                <Button size="sm" variant="ghost" onClick={() => { changeBoardReset(); }}>Reset wiring</Button>
-                <span className="zoomgroup">
-                <Button size="sm" variant="ghost" aria-label="Zoom out" onClick={() => bench.current.zoomBy(0.8)}>−</Button>
-                <Button size="sm" variant="ghost" onClick={() => bench.current.fit()}>Fit</Button>
-                <Button size="sm" variant="ghost" aria-label="Zoom in" onClick={() => bench.current.zoomBy(1.25)}>+</Button>
-                </span>
-              </div>
-            </div>
-            {nl.shorts && <p className="editor__err">Short circuit: a power pin and GND are wired together. Every module is switched off until you remove that wire.</p>}
-          </div>
-        </Panel>
+        {touchUI ? <Carousel slides={[['Bench', benchPanel], [hasOled ? 'Display + Serial' : 'Serial', <div className="carousel__stack">{hasOled && displayPanel}{serialPanel}</div>, 'side']]} /> : benchPanel}
 
         <div className="ide__side">
           {lesson && <LessonCard lesson={LESSONS.find((x) => x.id === lesson)} onFix={applyFix} onClose={() => setLesson(null)} />}
@@ -535,13 +549,8 @@ export function IDE({ active }) {
               {!parts.length && <p className="mh-micro">No parts on the bench. Add one from the bench toolbar.</p>}
             </div>
           </Panel>
-          {hasOled && (
-            <Panel title="Display" meta={`SSD1306 / SDA ${pinLabel(B.i2c.sda)} SCL ${pinLabel(B.i2c.scl)}`} enterDelay={260}>
-              <div className="oled"><canvas ref={oledCv} width={128} height={64} className="oled__cv" aria-label="OLED display output" /></div>
-            </Panel>
-          )}
-          <SerialMonitor lines={serial} baud={monitorBaud} setBaud={setMonitorBaud} sketchBaud={rt.current?.baud}
-            onSend={(t) => { rt.current?.send(t + '\n'); pushSerial(`> ${t}\n`, 'in'); }} onClear={() => setSerial([])} />
+          {!touchUI && hasOled && displayPanel}
+          {!touchUI && serialPanel}
         </div>
       </div>
     </div>
@@ -670,5 +679,35 @@ function SerialMonitor({ lines, baud, setBaud, sketchBaud, onSend, onClear }) {
         </div>
       </div>
     </Panel>
+  );
+}
+
+/**
+ * Touch layout: the wiring bench and a side column (display stacked over the serial monitor) in a strip you swipe through. The tabs above jump straight to
+ * a panel (swiping on the wiring bench itself pans the circuit, so the tabs are the way out of it).
+ */
+function Carousel({ slides }) {
+  const track = React.useRef(null);
+  const [at, setAt] = React.useState(0);
+  const go = (i) => { const el = track.current?.children[i]; if (el) track.current.scrollTo({ left: el.offsetLeft - track.current.offsetLeft, behavior: 'smooth' }); };
+  const onScroll = () => {
+    const t = track.current; if (!t) return;
+    const kids = [...t.children], x = t.scrollLeft + t.offsetLeft;
+    const i = kids.reduce((best, el, k) => (Math.abs(el.offsetLeft - x) < Math.abs(kids[best].offsetLeft - x) ? k : best), 0);
+    if (i !== at) setAt(i);
+  };
+  return (
+    <div className="carousel">
+      <div className="carousel__tabs" role="tablist" aria-label="Panels">
+        {slides.map(([name], i) => (
+          <button key={name} type="button" role="tab" aria-selected={i === at} className="carousel__tab" onClick={() => go(i)}>
+            <span className="carousel__dot" aria-hidden="true" />{name}
+          </button>
+        ))}
+      </div>
+      <div className="carousel__track" ref={track} onScroll={onScroll}>
+        {slides.map(([name, el, kind]) => <div key={name} className="carousel__slide" data-kind={kind} role="tabpanel" aria-label={name}>{el}</div>)}
+      </div>
+    </div>
   );
 }

@@ -55,6 +55,8 @@ The desktop and the touch versions differ only in how you move around and select
 | Zoom | Scroll, or the − / Fit / + buttons | Pinch, or the − / Fit / + buttons |
 | Select several parts | Shift + drag a box, or Shift + click | **Select** tool, then drag a box |
 
+On touch, the Maker IDE puts the wiring bench and a side column (the display stacked over the serial monitor) in a strip you swipe through. Tap the **Bench** and **Display + Serial** tabs to jump between them, since swiping on the bench itself pans the circuit.
+
 | Key | Action |
 | --- | --- |
 | 1 to 9, B | Pick a part to place (Simulator) |
