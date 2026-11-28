@@ -178,6 +178,10 @@ html, body, #root { height: 100%; margin: 0; background: oklch(0.08 0 0); }
   /* The shell scrolls in this layout, so the IDE takes its natural height instead of filling the window. */
   .ide, .ide__grid { flex: none; min-height: auto; }
 }
+/* Android app / touch screens: contain: size stops the line numbers from stretching the box to the whole sketch,
+   so the code scrolls inside the editor. */
+.app[data-touch-ui] .editor { contain: size; }
+@media (max-width: 1180px) { .app[data-touch-ui] .editor { flex: none; height: min(60vh, 560px); } }
 
 /* Wiring bench */
 .ide__bench { min-height: 0; }

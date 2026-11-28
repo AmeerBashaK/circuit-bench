@@ -8,6 +8,7 @@ import {
 } from './engine.js';
 import { HAND_LEVELS, combos, logicRules, mission, truthTest } from './missions.js';
 import { IDE } from './ide/IDE.jsx';
+import { touchUI } from './platform.js';
 import { openProject, saveProject } from './projectFile.js';
 
 const pad = (v, n = 2) => String(v).padStart(n, '0');
@@ -31,7 +32,9 @@ function textStyle(id, glow) {
   return { '--mh-fg': base, '--mh-fg-muted': shade(base, 0.85), '--mh-fg-faint': faint, '--cb-text': base, '--cb-text-faint': faint };
 }
 const HINTS = {
-  select: 'Click to select; click a selected switch to flip it. Drag empty space to pan, Shift+drag to box-select.',
+  select: touchUI ? 'Tap to select; tap a selected switch to flip it. Drag empty space to box-select. Pan moves the bench; two fingers pan and pinch.'
+    : 'Click to select; click a selected switch to flip it. Drag empty space to pan; Shift+drag to box-select.',
+  pan: 'Drag to move around the bench. Two fingers pan and pinch to zoom.',
   delete: 'Click a part to delete it.',
   bjt: 'Click a grid point to place the transistor, base on the left.',
   wire: 'Drag between grid points to draw a wire.',
@@ -58,7 +61,7 @@ export function App() {
 
   return (
     <MonohudProvider theme={theme} motion={motion} sound={sound} distortion={Math.min(1, 0.1 + surge)}
-      style={textStyle(textColor, glow)} data-cb-glow={glow ? '' : undefined}
+      style={textStyle(textColor, glow)} data-cb-glow={glow ? '' : undefined} data-touch-ui={touchUI ? '' : undefined}
       alert={redUntil > Date.now() ? 'red' : 'none'} className="app">
       <GridBackground />
       <Bench {...{ theme, setTheme, motion, setMotion, sound, setSound, setSurge, setRedUntil, textColor, setTextColor, glow, setGlow }} />
@@ -271,7 +274,7 @@ function Bench({ theme, setTheme, motion, setMotion, sound, setSound, setSurge, 
         <Panel title={mode === 'game' ? `Mission ${pad(level)}` : 'Bench'} meta={bench ? `X${bench.center.x} Y${bench.center.y} / ${Math.round(bench.zoom * 100)}%` : ''} className="stage" enterDelay={120}>
           <div className="stage__wrap">
             <canvas ref={cvRef} className="stage__cv" aria-label="Circuit drawing area. Drag to draw parts, scroll to zoom, drag empty space to pan." />
-            <p className="stage__hint mh-micro">{bench ? HINTS[bench.tool] || `Drag between two grid points to place a ${TYPES[bench.tool].label.toLowerCase()}. The first point is the + side.` : ''}</p>
+            <p className="stage__hint mh-micro">{bench ? HINTS[bench.tool] || (TYPES[bench.tool] ? `Drag between two grid points to place a ${TYPES[bench.tool].label.toLowerCase()}. The first point is the + side.` : '') : ''}</p>
             <div className="stage__zoom">
               <Button size="sm" variant="ghost" disabled={!bench?.canUndo} title="Ctrl + Z" onClick={() => bench.undo()}>Undo</Button>
               <Button size="sm" variant="ghost" disabled={!bench?.canRedo} title="Ctrl + Y" onClick={() => bench.redo()}>Redo</Button>
@@ -438,7 +441,7 @@ function Inspector({ bench, sel, onRepaired }) {
           <p>Pick a part in the toolbar, then drag between two grid points to place it. Click a part to edit it.</p>
           <DataList rows={[
             { label: 'Move', value: 'DRAG PART' }, { label: 'Stretch', value: 'DRAG END' },
-            { label: 'Pan', value: 'DRAG EMPTY' }, { label: 'Box select', value: 'SHIFT + DRAG' }, { label: 'Add to selection', value: 'SHIFT + CLICK' },
+            ...(touchUI ? [{ label: 'Box select', value: 'DRAG EMPTY' }, { label: 'Pan', value: 'PAN TOOL / TWO FINGERS' }] : [{ label: 'Pan', value: 'DRAG EMPTY' }, { label: 'Box select', value: 'SHIFT + DRAG' }]), { label: 'Add to selection', value: 'SHIFT + CLICK' },
             { label: 'Copy / paste', value: 'CTRL + C / V' }, { label: 'Zoom', value: 'SCROLL' },
             { label: 'Delete', value: 'DEL' }, { label: 'Flip', value: 'F' }, { label: 'Rotate Q', value: 'R' },
             { label: 'Pause', value: 'SPACE' }, { label: 'Parts', value: '1 – 9' },

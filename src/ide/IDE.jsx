@@ -3,6 +3,7 @@ import { Button, Menu, Panel, Progress, Readout, Select, Slider, Status, Switch,
 import { SKETCH_NAMES, createRuntime, errorLine } from './runtime.js';
 import { friendlyError, lintSketch } from './lint.js';
 import { tokenLines } from './highlight.js';
+import { touchUI } from '../platform.js';
 import { SKETCHES, fillSketch } from './examples.js';
 import { BOARDS, BOARD_ITEMS, CAPS, CAP_VOLTS, COMPONENTS, RAIL_LENGTHS, railHoles, resizeRail, MODULES, PARTS, RESISTORS, componentDemo, defaultLayout, fmtR, netlist, newId, partLabels, propsOf, sketchPins } from './boards.js';
 import { createCircuit } from './circuit.js';
@@ -68,6 +69,8 @@ export function IDE({ active }) {
   const [lastExample, setLastExample] = React.useState(() => store.get('cbh-ide-example', { key: 'dashboard', filled: null }));
   const [env, setEnv] = React.useState({});
   const [state, setState] = React.useState({ status: 'idle', error: '', line: null, upload: 0, errLines: [] });
+  const [benchTool, setBenchTool] = React.useState('select');
+  const pickTool = (t) => { bench.current?.setTool(t); setBenchTool(t); };
   const editorRef = React.useRef(null), gutterRef = React.useRef(null), hlRef = React.useRef(null);
   // Put the caret on a line and scroll it into view.
   const goToLine = (n) => {
@@ -488,10 +491,14 @@ export function IDE({ active }) {
             <div className="wb__stage">
               <canvas ref={benchCv} className="wb__cv" tabIndex={0} aria-label="Wiring bench. Drag from a pin to another pin to add a jumper wire. Drag parts to move them, drag empty space to pan, scroll to zoom."
                 onKeyDown={(e) => { if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSelected(); } if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey) rotateSelected(); if (e.key === 'Escape') bench.current?.select(null); }} />
-              <p className="stage__hint mh-micro">{selection ? `${USE_HINT[selObj?.type] ? `${USE_HINT[selObj.type]} · ` : ''}DEL removes the selected ${selection.kind === 'wire' ? 'wire' : 'part'}${selObj && PARTS[selObj.type]?.axial ? ' · R rotates it' : ''}` : 'Drag pin to pin to add a wire. Click a wire, then drag its end handle to move it to another pin. Drag empty space to pan, Shift+drag to box-select. Ctrl+Z undoes. Scroll to zoom.'}</p>
+              <p className="stage__hint mh-micro">{selection ? `${USE_HINT[selObj?.type] ? `${USE_HINT[selObj.type]} · ` : ''}DEL removes the selected ${selection.kind === 'wire' ? 'wire' : 'part'}${selObj && PARTS[selObj.type]?.axial ? ' · R rotates it' : ''}` : `Drag pin to pin to add a wire. Click a wire, then drag its end handle to move it to another pin. ${touchUI ? 'Select: drag empty space to box-select. Pan: drag to move around. Two fingers pan and pinch.' : 'Drag empty space to pan, Shift+drag to box-select.'} Ctrl+Z undoes. Scroll to zoom.`}</p>
               <div className="stage__zoom">
                 {selObj && PARTS[selObj.type]?.axial && <Button size="sm" variant="ghost" onClick={rotateSelected}>Rotate</Button>}
                 {groupSize > 0 && !(groupSize === 1 && selObj?.kind === 'board') && <Button size="sm" variant="danger" onClick={removeSelected}>{groupSize > 1 ? `Delete ${groupSize}` : 'Delete'}</Button>}
+                {touchUI && <span className="zoomgroup" role="group" aria-label="Bench tool">
+                  <Button size="sm" variant={benchTool === 'select' ? 'secondary' : 'ghost'} aria-pressed={benchTool === 'select'} title="Drag empty space to box-select" onClick={() => pickTool('select')}>Select</Button>
+                  <Button size="sm" variant={benchTool === 'pan' ? 'secondary' : 'ghost'} aria-pressed={benchTool === 'pan'} title="Drag to move around the bench" onClick={() => pickTool('pan')}>Pan</Button>
+                </span>}
                 <Button size="sm" variant="ghost" disabled={!groupSize} title="Ctrl + C" onClick={copySelected}>Copy</Button>
                 <Button size="sm" variant="ghost" disabled={!clip.current} title="Ctrl + V" onClick={pasteClip}>Paste</Button>
                 <Button size="sm" variant="ghost" disabled={!hist.current.past.length} title="Ctrl + Z" onClick={() => travel(true)}>Undo</Button>

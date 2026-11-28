@@ -1,6 +1,7 @@
 // Circuit Bench simulator, ported from AmeerBashaK/circuit-bench and restyled for a monochrome HUD.
 // Nodal analysis with Newton-Raphson for diodes, LEDs and transistors, backward Euler for capacitors.
 
+import { touchUI } from './platform.js';
 import { LEDC, VT, QVC, dcalc, dlimit, dpar as diodeParams, pnj, qcalc } from './models.js';
 
 export { LEDC };
@@ -32,7 +33,7 @@ export const FIELDS = {
   switch: [['closed', 'Closed', 'chk']],
 };
 export const TOOLS = [
-  ['select', 'Select', 'Q'], ['delete', 'Delete', 'X'], null,
+  ['select', 'Select', 'Q'], ...(touchUI ? [['pan', 'Pan', 'H']] : []), ['delete', 'Delete', 'X'], null,
   ['wire', 'Wire', '1'], ['resistor', 'Resistor', '2'], ['capacitor', 'Capacitor', '3'], ['diode', 'Diode', '4'],
   ['led', 'LED', '5'], ['bjt', 'Transistor', '6'], ['switch', 'Switch', '7'], ['button', 'Push button', 'B'], null,
   ['dc', 'DC source', '8'], ['ac', 'AC source', '9'],
@@ -687,7 +688,7 @@ export function createBench(cv, scope, hooks) {
   function repair(e) { e.failed = false; e.heat = 0; e.vc = 0; changed(); }
   function replace(e, type) { if (e.locked || !allowedTool(type)) return; checkpoint(); const ne = mk(type, e.a, e.b); els[els.indexOf(e)] = ne; log(`Replaced ${e.name || 'wire'} with ${ne.name || 'a wire'}.`); select(ne); dirty = true; }
   function setProp(e, k, v) { if (e.locked) return; checkpoint(`prop:${e.id}:${k}`); e.props[k] = v; save(); changed(); }
-  const allowedTool = (tl) => tl === 'select' || tl === 'delete' || !allowed || allowed.includes(tl);
+  const allowedTool = (tl) => tl === 'select' || tl === 'pan' || tl === 'delete' || !allowed || allowed.includes(tl);
   function setTool(tl) { if (!allowedTool(tl)) return; tool = tl; drawing = null; changed(); }
   function togglePlay() { running = !running; changed(); }
   function repairAll() { for (const e of els) { e.failed = false; e.heat = 0; e.vc = 0; e.flame = 0; e.hist = []; } t = 0; particles = []; dirty = true; log('All parts repaired and capacitors discharged.'); }
@@ -736,13 +737,18 @@ export function createBench(cv, scope, hooks) {
   function onDown(ev) {
     cv.setPointerCapture(ev.pointerId); const p = ptr(ev), g = snap(p);
     // Middle or right button, or the pan tool, always moves the view.
-    if (ev.button === 1 || ev.button === 2) { ev.preventDefault(); startPan(ev); return; }
+    if (ev.button === 1 || ev.button === 2 || tool === 'pan') { ev.preventDefault(); startPan(ev); return; }
     if (tool === 'select' || tool === 'delete') {
       const e = hit(p.x, p.y);
       if (tool === 'delete') { if (e) remove(e); return; }
       if (ev.shiftKey && e) { toggle(e); return; }
-      // Empty space: drag pans (trackpads have no right-drag); Shift+drag draws a selection box.
-      if (!e) { if (ev.shiftKey) marquee = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, base: [...multi] }; else { select(null); startPan(ev); } return; }
+      // Empty space. Touch (no Shift key, so a Pan tool instead): drag draws a selection box.
+      // Desktop: drag pans, Shift+drag draws a selection box.
+      if (!e) {
+        if (touchUI || ev.shiftKey) { if (!ev.shiftKey) select(null); marquee = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, base: [...multi] }; }
+        else { select(null); startPan(ev); }
+        return;
+      }
       const wasSel = multi.size === 1 && multi.has(e); // parts work once they are selected
       if (!multi.has(e)) select(e);
       if (e.type === 'button' && wasSel) { e.props.pressed = true; held = e; changed(); }
@@ -791,6 +797,42 @@ export function createBench(cv, scope, hooks) {
     if (drag) { if (!drag.moved && drag.wasSel && drag.e.type === 'switch') toggleSwitch(drag.e); if (drag.moved) dirty = true; drag = null; }
   }
   const onLeave = () => { hover = null; };
+  const ZMIN = 0.2;
+  function cancelGesture() { if (held) { held.props.pressed = false; held = null; } drag = null; marquee = null; drawing = null; pan = null; cv.style.cursor = ''; }
+
+  // Touch: two fingers pan and pinch-zoom the bench whatever tool is picked. A second finger cancels the
+  // one-finger gesture the first finger started.
+  const touches = new Map(); let pinch = null;
+  function pinchStart() {
+    const [a, b] = [...touches.values()], r = cv.getBoundingClientRect();
+    const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: cam.z, wx: cam.x + mx / cam.z, wy: cam.y + my / cam.z };
+  }
+  function pinchMove() {
+    const [a, b] = [...touches.values()], r = cv.getBoundingClientRect();
+    const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+    const z = Math.max(ZMIN, Math.min(3, pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d)));
+    cam.z = z; cam.x = pinch.wx - mx / z; cam.y = pinch.wy - my / z;
+  }
+  function tDown(ev) {
+    if (ev.pointerType === 'touch') {
+      touches.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (touches.size === 2) { cancelGesture(); pinchStart(); return; }
+      if (touches.size > 2) return;
+    }
+    if (!pinch) onDown(ev);
+  }
+  function tMove(ev) {
+    if (touches.has(ev.pointerId)) touches.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pinch) { if (touches.size === 2) pinchMove(); return; }
+    onMove(ev);
+  }
+  function tUp(ev) {
+    touches.delete(ev.pointerId);
+    if (pinch) { if (touches.size < 2) pinch = null; return; }
+    onUp(ev);
+  }
+
   function onWheel(ev) {
     ev.preventDefault(); const r = cv.getBoundingClientRect();
     zoomAt(Math.exp(-ev.deltaY * 0.0015), ev.clientX - r.left, ev.clientY - r.top);
@@ -819,8 +861,8 @@ export function createBench(cv, scope, hooks) {
     else if (ev.key === 'Escape') { setTool('select'); select(null); }
     else { const tl = TOOLS.find((x) => x && x[2].toLowerCase() === k); if (tl) setTool(tl[0]); }
   }
-  cv.addEventListener('pointerdown', onDown); cv.addEventListener('pointermove', onMove);
-  cv.addEventListener('pointerleave', onLeave); cv.addEventListener('pointerup', onUp);
+  cv.addEventListener('pointerdown', tDown); cv.addEventListener('pointermove', tMove);
+  cv.addEventListener('pointerleave', onLeave); cv.addEventListener('pointerup', tUp); cv.addEventListener('pointercancel', tUp);
   cv.addEventListener('wheel', onWheel, { passive: false }); cv.addEventListener('contextmenu', onMenu);
   document.addEventListener('keydown', onKey);
 

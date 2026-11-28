@@ -1,5 +1,6 @@
 // Wiring bench: an infinite grid where a board, sensor modules and a power rail sit, joined by
 // jumper wires dragged from pin to pin. Drawing only; the netlist lives in boards.js.
+import { touchUI } from '../platform.js';
 import { BOARDS, MODULES, NO_POWER_LED, PARTS, def, fmtR, pinsOf, propsOf, railHoles, resizeRail, size } from './boards.js';
 import { LEDC } from '../models.js';
 import { previewRouter, routeAll } from './router.js';
@@ -16,6 +17,7 @@ const SIGNAL_COLORS = ['#e6e6e6', '#5aa9ff', '#5fd38d', '#f0a043', '#c58cff', '#
 export function createWiringBench(cv, opts) {
   const ctx = cv.getContext('2d');
   const cam = { x: -600, y: -320, z: 1 };
+  let tool = 'select'; // 'select' draws a box on empty space; 'pan' moves the view wherever you drag
   let hover = null, wiring = null, drag = null, pan = null, sel = null, group = { objs: new Set(), wires: new Set() }, marquee = null, raf = 0, active = true, mouse = null, pressed = null, clock = 0;
   let railGrip = null, gripHover = null; // rail being resized, rail whose grip is under the pointer
   const gripAt = (wx, wy) => layout().objects.find((o) => o.type === 'rail' && Math.abs(wx / G - (o.x + railHoles(o) + 1.3)) < 0.8 && wy / G > o.y - 0.8 && wy / G < o.y + 1.8);
@@ -556,7 +558,7 @@ export function createWiringBench(cv, opts) {
   function onDown(ev) {
     cv.setPointerCapture(ev.pointerId); cv.focus({ preventScroll: true });
     const p = world(ev);
-    if (ev.button === 1 || ev.button === 2) { pan = { x: ev.clientX, y: ev.clientY, cx: cam.x, cy: cam.y }; return; }
+    if (ev.button === 1 || ev.button === 2 || tool === 'pan') { pan = { x: ev.clientX, y: ev.clientY, cx: cam.x, cy: cam.y }; cv.style.cursor = 'grabbing'; return; }
     const pinHit = hitPin(p.x, p.y);
     const selWire = sel?.kind === 'wire' && layout().wires.find((q) => q.id === sel.id);
     if (selWire && pinHit && (selWire.a === pinHit.key || selWire.b === pinHit.key)) {
@@ -578,8 +580,9 @@ export function createWiringBench(cv, opts) {
       const L = layout(), orig = new Map(L.objects.filter((q) => group.objs.has(q.id)).map((q) => [q.id, { x: q.x, y: q.y }]));
       drag = { gx: p.x / G, gy: p.y / G, orig, dx: 0, dy: 0, wasSel, obj: o }; return;
     }
-    // Empty space: drag pans (trackpads have no right-drag); Shift+drag draws a selection box.
-    if (!ev.shiftKey) { setSel(null); pan = { x: ev.clientX, y: ev.clientY, cx: cam.x, cy: cam.y }; return; }
+    // Empty space. Touch: drag draws a selection box (a Pan tool moves the view). Desktop: drag pans, Shift+drag selects.
+    if (!touchUI && !ev.shiftKey) { setSel(null); pan = { x: ev.clientX, y: ev.clientY, cx: cam.x, cy: cam.y }; return; }
+    if (!ev.shiftKey) setSel(null);
     marquee = { x0: p.x, y0: p.y, x1: p.x, y1: p.y, objs: [...group.objs], wires: [...group.wires] };
   }
   function onMove(ev) {
@@ -636,6 +639,42 @@ export function createWiringBench(cv, opts) {
     railGrip = null;
     drag = null; pan = null; cv.style.cursor = '';
   }
+  const ZMIN = 0.25;
+  function cancelGesture() { if (pressed) { opts.onPress?.(pressed, false); pressed = null; } if (drag || railGrip) opts.endGesture?.(); drag = null; marquee = null; wiring = null; pan = null; railGrip = null; }
+
+  // Touch: two fingers pan and pinch-zoom the bench whatever tool is picked. A second finger cancels the
+  // one-finger gesture the first finger started.
+  const touches = new Map(); let pinch = null;
+  function pinchStart() {
+    const [a, b] = [...touches.values()], r = cv.getBoundingClientRect();
+    const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: cam.z, wx: cam.x + mx / cam.z, wy: cam.y + my / cam.z };
+  }
+  function pinchMove() {
+    const [a, b] = [...touches.values()], r = cv.getBoundingClientRect();
+    const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+    const z = Math.max(ZMIN, Math.min(3, pinch.z * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.d)));
+    cam.z = z; cam.x = pinch.wx - mx / z; cam.y = pinch.wy - my / z;
+  }
+  function tDown(ev) {
+    if (ev.pointerType === 'touch') {
+      touches.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+      if (touches.size === 2) { cancelGesture(); pinchStart(); return; }
+      if (touches.size > 2) return;
+    }
+    if (!pinch) onDown(ev);
+  }
+  function tMove(ev) {
+    if (touches.has(ev.pointerId)) touches.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pinch) { if (touches.size === 2) pinchMove(); return; }
+    onMove(ev);
+  }
+  function tUp(ev) {
+    touches.delete(ev.pointerId);
+    if (pinch) { if (touches.size < 2) pinch = null; return; }
+    onUp(ev);
+  }
+
   function onWheel(ev) {
     ev.preventDefault(); const p = world(ev);
     // Scrolling on a selected knob or sensor turns it instead of zooming.
@@ -646,7 +685,7 @@ export function createWiringBench(cv, opts) {
   }
   const onLeave = () => { hover = null; mouse = null; };
   const onMenu = (e) => e.preventDefault();
-  cv.addEventListener('pointerdown', onDown); cv.addEventListener('pointermove', onMove); cv.addEventListener('pointerup', onUp);
+  cv.addEventListener('pointerdown', tDown); cv.addEventListener('pointermove', tMove); cv.addEventListener('pointerup', tUp); cv.addEventListener('pointercancel', tUp);
   cv.addEventListener('pointerleave', onLeave); cv.addEventListener('wheel', onWheel, { passive: false }); cv.addEventListener('contextmenu', onMenu);
   readTokens();
 
@@ -668,6 +707,7 @@ export function createWiringBench(cv, opts) {
 
   return {
     fit, effect, get zoom() { return cam.z; },
+    get tool() { return tool; }, setTool(t) { tool = t === 'pan' ? 'pan' : 'select'; cv.style.cursor = tool === 'pan' ? 'grab' : ''; },
     zoomBy(f) { const w = cv.clientWidth / 2, h = cv.clientHeight / 2, wx = cam.x + w / cam.z, wy = cam.y + h / cam.z; cam.z = Math.max(0.25, Math.min(3, cam.z * f)); cam.x = wx - w / cam.z; cam.y = wy - h / cam.z; },
     get selection() { return sel; }, select: setSel, setGroup,
     get group() { return { objs: [...group.objs], wires: [...group.wires] }; },

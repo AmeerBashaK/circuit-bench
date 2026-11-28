@@ -1,0 +1,26 @@
+{
+  "name": "circuit-bench-desktop",
+  "productName": "Circuit Bench",
+  "version": "1.0.0",
+  "description": "Circuit simulator, Missions and Maker IDE as a Windows desktop app",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "web": "node ../copy-web.mjs desktop",
+    "start": "npm run web && electron .",
+    "dist": "npm run web && electron-builder --win portable --x64"
+  },
+  "devDependencies": {
+    "electron": "^39.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.circuitbench.app",
+    "productName": "Circuit Bench",
+    "files": ["main.js", "icon.png", "app/**/*"],
+    "extraMetadata": { "main": "main.js" },
+    "directories": { "output": "release" },
+    "win": { "icon": "../icon/icon.ico", "target": [{ "target": "portable", "arch": ["x64"] }] },
+    "portable": { "artifactName": "CircuitBench-${version}-portable.exe" }
+  }
+}

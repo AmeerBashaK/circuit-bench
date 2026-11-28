@@ -1,2 +1,12 @@
 node_modules
 Output/dist
+dist
+
+# Packaging: generated or downloaded, rebuilt from the steps in docs/BUILDING.md
+packaging/desktop/node_modules
+packaging/desktop/app
+packaging/desktop/release
+packaging/desktop/icon.png
+packaging/android/node_modules
+packaging/android/www
+packaging/android/android

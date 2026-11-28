@@ -1,0 +1,6 @@
+{
+  "appId": "com.circuitbench.app",
+  "appName": "Circuit Bench",
+  "webDir": "www",
+  "android": { "backgroundColor": "#050505" }
+}
